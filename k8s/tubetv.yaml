@@ -54,5 +54,5 @@ spec:
             httpGet: {path: /healthz, port: 8080}
             periodSeconds: 30
           resources:
-            requests: {memory: 192Mi, cpu: 100m}
-            limits: {memory: 768Mi, cpu: 1500m}
+            requests: {memory: 256Mi, cpu: 500m}
+            limits: {memory: 1Gi, cpu: 3000m}

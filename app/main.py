@@ -4,6 +4,7 @@ import logging
 import os
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from cachetools import TTLCache
@@ -28,13 +29,21 @@ RESOLVE_TTL = int(os.getenv("RESOLVE_TTL", "1500"))
 log = logging.getLogger("tubetv")
 
 
+# Fixed workers so each keeps its own warmed-up yt-dlp instance (see youtube._resolver).
+_WORKERS = int(os.getenv("MAX_CONCURRENCY", "3"))
+_pool = ThreadPoolExecutor(max_workers=_WORKERS, thread_name_prefix="yt")
+
+
 def _warm_up() -> None:
-    # The first resolve after a start spends ~40s initialising yt-dlp's JS challenge solver; do it now.
-    try:
-        youtube.resolve("9bZkp7q19f0")
-        log.info("warm-up resolve done")
-    except Exception as e:
-        log.warning("warm-up resolve failed: %s", e)
+    # The first resolve on each instance spends ~40s initialising yt-dlp's JS challenge solver; do it now.
+    def one(_: int) -> None:
+        try:
+            youtube.resolve("9bZkp7q19f0")
+            log.info("warm-up resolve done")
+        except Exception as e:
+            log.warning("warm-up resolve failed: %s", e)
+
+    list(_pool.map(one, range(_WORKERS)))
 
 
 @contextlib.asynccontextmanager
@@ -52,7 +61,7 @@ _gate = asyncio.Semaphore(int(os.getenv("MAX_CONCURRENCY", "3")))
 
 async def _run(fn, *args) -> Any:
     async with _gate:
-        return await asyncio.to_thread(fn, *args)
+        return await asyncio.get_running_loop().run_in_executor(_pool, fn, *args)
 
 
 async def _search(query: str, count: int) -> list[dict[str, Any]]:

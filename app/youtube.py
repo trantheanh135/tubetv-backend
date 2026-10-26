@@ -1,5 +1,6 @@
 """Thin yt-dlp wrapper: flat search results and stream resolution."""
 import re
+import threading
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
@@ -18,6 +19,18 @@ def _opts(**extra: Any) -> dict[str, Any]:
         "extractor_retries": 2,
         **extra,
     }
+
+
+_local = threading.local()
+
+
+def _resolver() -> yt_dlp.YoutubeDL:
+    # One instance per worker thread: yt-dlp keeps the parsed player JS and solved challenges
+    # on the instance, so a fresh one per request repeats the slow deno work every time.
+    ydl = getattr(_local, "ydl", None)
+    if ydl is None:
+        ydl = _local.ydl = yt_dlp.YoutubeDL(_opts())
+    return ydl
 
 
 def _thumb(video_id: str) -> str:
@@ -113,8 +126,7 @@ def pick_streams(formats: list[dict[str, Any]], max_height: int = MAX_HEIGHT) ->
 def resolve(video_id: str) -> dict[str, Any]:
     if not re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id):
         raise ValueError("bad video id")
-    with yt_dlp.YoutubeDL(_opts()) as ydl:
-        info = ydl.extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
+    info = _resolver().extract_info(f"https://www.youtube.com/watch?v={video_id}", download=False)
     streams = pick_streams(info.get("formats") or [])
     if not streams:
         raise LookupError("no playable stream")
