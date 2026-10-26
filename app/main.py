@@ -35,15 +35,14 @@ _pool = ThreadPoolExecutor(max_workers=_WORKERS, thread_name_prefix="yt")
 
 
 def _warm_up() -> None:
-    # The first resolve on each instance spends ~40s initialising yt-dlp's JS challenge solver; do it now.
-    def one(_: int) -> None:
-        try:
-            youtube.resolve("9bZkp7q19f0")
-            log.info("warm-up resolve done")
-        except Exception as e:
-            log.warning("warm-up resolve failed: %s", e)
-
-    list(_pool.map(one, range(_WORKERS)))
+    # The first resolve on a yt-dlp instance spends ~40s initialising its JS challenge solver; do it now,
+    # on a pool worker so that worker's instance is the warm one. Once only: parallel deno solves at boot
+    # starved the node (and its API server) of CPU.
+    try:
+        _pool.submit(youtube.resolve, "9bZkp7q19f0").result()
+        log.info("warm-up resolve done")
+    except Exception as e:
+        log.warning("warm-up resolve failed: %s", e)
 
 
 @contextlib.asynccontextmanager
