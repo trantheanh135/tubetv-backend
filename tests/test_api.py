@@ -65,3 +65,31 @@ def test_feed_unknown_category_404():
 
 def test_categories_listed():
     assert client.get("/api/categories").json()[0]["id"] == "trending"
+
+
+def test_channel_search_dedupes_channels(monkeypatch):
+    cards = [
+        {"id": "a" * 11, "channel": "A", "channelId": "UC1", "thumb": "t1"},
+        {"id": "b" * 11, "channel": "A", "channelId": "UC1", "thumb": "t2"},
+        {"id": "c" * 11, "channel": "B", "channelId": "UC2", "thumb": "t3"},
+        {"id": "d" * 11, "channel": "C", "channelId": "", "thumb": "t4"},
+    ]
+    monkeypatch.setattr(youtube, "search", lambda q, n: cards)
+    main._search_cache.clear()
+    res = client.get("/api/channels/search", params={"q": "kids"}).json()
+    assert [c["id"] for c in res] == ["UC1", "UC2"]
+    assert res[0]["thumb"] == "t1"
+
+
+def test_channel_bad_id_is_400():
+    assert client.get("/api/channel/nope").status_code == 400
+
+
+def test_channel_feed_cached(monkeypatch):
+    calls = []
+    monkeypatch.setattr(youtube, "channel_videos", lambda cid, n: calls.append(cid) or [{"id": "x" * 11}])
+    main._search_cache.clear()
+    cid = "UC" + "a" * 22
+    assert client.get(f"/api/channel/{cid}").json() == [{"id": "x" * 11}]
+    client.get(f"/api/channel/{cid}")
+    assert calls == [cid]

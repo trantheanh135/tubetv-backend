@@ -42,6 +42,7 @@ def _card(e: dict[str, Any]) -> dict[str, Any]:
         "id": e["id"],
         "title": e.get("title") or "",
         "channel": e.get("channel") or e.get("uploader") or "",
+        "channelId": e.get("channel_id") or "",
         "duration": int(e["duration"]) if e.get("duration") else None,
         "views": e.get("view_count"),
         "thumb": _thumb(e["id"]),
@@ -65,6 +66,38 @@ def _expiry(url: str) -> int | None:
         return int(parse_qs(urlparse(url).query)["expire"][0])
     except (KeyError, ValueError, IndexError):
         return None
+
+
+CHANNEL_ID = re.compile(r"UC[A-Za-z0-9_-]{22}")
+
+
+def channel_videos(channel_id: str, count: int) -> list[dict[str, Any]]:
+    """Latest uploads of a channel (flat listing of its /videos tab)."""
+    if not CHANNEL_ID.fullmatch(channel_id):
+        raise ValueError("bad channel id")
+    opts = _opts(extract_flat="in_playlist", playlistend=count)
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        info = ydl.extract_info(f"https://www.youtube.com/channel/{channel_id}/videos", download=False)
+    name = info.get("channel") or info.get("uploader") or info.get("title") or ""
+    out = []
+    for e in info.get("entries") or []:
+        if not e or not e.get("id") or len(e["id"]) != 11:
+            continue
+        card = _card(e)
+        card["channelId"] = channel_id
+        card["channel"] = card["channel"] or name
+        out.append(card)
+    return out
+
+
+def channels_from(cards: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """Distinct channels in a list of video cards, with one sample thumbnail each."""
+    seen: dict[str, dict[str, str]] = {}
+    for c in cards:
+        cid = c.get("channelId")
+        if cid and cid not in seen:
+            seen[cid] = {"id": cid, "name": c.get("channel") or "", "thumb": c["thumb"]}
+    return list(seen.values())
 
 
 def pick_streams(formats: list[dict[str, Any]], max_height: int = MAX_HEIGHT) -> dict[str, Any]:
@@ -135,6 +168,7 @@ def resolve(video_id: str) -> dict[str, Any]:
         "id": video_id,
         "title": info.get("title") or "",
         "channel": info.get("channel") or info.get("uploader") or "",
+        "channelId": info.get("channel_id") or "",
         "description": (info.get("description") or "")[:1500],
         "duration": int(info["duration"]) if info.get("duration") else None,
         "live": bool(info.get("is_live")),

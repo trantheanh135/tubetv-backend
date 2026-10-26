@@ -103,6 +103,27 @@ async def search(q: str = Query(..., min_length=1, max_length=120),
     return items[(page - 1) * size: page * size]
 
 
+@app.get("/api/channel/{channel_id}")
+async def channel(channel_id: str, limit: int = Query(24, ge=1, le=50)) -> list[dict[str, Any]]:
+    key = ("channel", channel_id, limit)
+    if key in _search_cache:
+        return _search_cache[key]
+    try:
+        items = await _run(youtube.channel_videos, channel_id, limit)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    except Exception as e:
+        raise HTTPException(502, f"channel failed: {e}") from e
+    _search_cache[key] = items
+    return items
+
+
+@app.get("/api/channels/search")
+async def channel_search(q: str = Query(..., min_length=1, max_length=120)) -> list[dict[str, str]]:
+    # Channels behind the first 30 video hits; flat search has no channel-only mode.
+    return youtube.channels_from(await _search(q, 30))
+
+
 @app.get("/api/video/{video_id}")
 async def video(video_id: str) -> dict[str, Any]:
     cached = _resolve_cache.get(video_id)
