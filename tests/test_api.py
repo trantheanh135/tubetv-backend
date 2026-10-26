@@ -1,4 +1,8 @@
-from fastapi.testclient import TestClient
+import os
+
+os.environ["WARM_UP"] = "0"
+
+from fastapi.testclient import TestClient  # noqa: E402
 
 from app import main, youtube
 

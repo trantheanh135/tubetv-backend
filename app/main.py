@@ -1,5 +1,8 @@
 import asyncio
+import contextlib
+import logging
 import os
+import threading
 import time
 from typing import Any
 
@@ -22,7 +25,26 @@ SEARCH_TTL = int(os.getenv("SEARCH_TTL", "900"))
 # Stream URLs from YouTube live ~6h; keep ours well under that.
 RESOLVE_TTL = int(os.getenv("RESOLVE_TTL", "1500"))
 
-app = FastAPI(title="tubetv-backend")
+log = logging.getLogger("tubetv")
+
+
+def _warm_up() -> None:
+    # The first resolve after a start spends ~40s initialising yt-dlp's JS challenge solver; do it now.
+    try:
+        youtube.resolve("9bZkp7q19f0")
+        log.info("warm-up resolve done")
+    except Exception as e:
+        log.warning("warm-up resolve failed: %s", e)
+
+
+@contextlib.asynccontextmanager
+async def lifespan(_: FastAPI):
+    if os.getenv("WARM_UP", "1") == "1":
+        threading.Thread(target=_warm_up, daemon=True).start()
+    yield
+
+
+app = FastAPI(title="tubetv-backend", lifespan=lifespan)
 _search_cache: TTLCache = TTLCache(maxsize=256, ttl=SEARCH_TTL)
 _resolve_cache: TTLCache = TTLCache(maxsize=256, ttl=RESOLVE_TTL)
 _gate = asyncio.Semaphore(int(os.getenv("MAX_CONCURRENCY", "3")))
