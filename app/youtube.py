@@ -96,6 +96,13 @@ def pick_streams(formats: list[dict[str, Any]], max_height: int = MAX_HEIGHT) ->
     if v and a:
         result["video"] = entry(v)
         result["audio"] = entry(a)
+        # One variant per height (best bitrate), ascending, so the TV can pick a quality it decodes smoothly.
+        per_height: dict[int, dict[str, Any]] = {}
+        for f in videos:
+            hgt = f.get("height") or 0
+            if hgt not in per_height or (f.get("tbr") or 0) > (per_height[hgt].get("tbr") or 0):
+                per_height[hgt] = f
+        result["videos"] = [entry(per_height[k]) for k in sorted(per_height)]
     if m:
         result["muxed"] = entry(m)
     if h:

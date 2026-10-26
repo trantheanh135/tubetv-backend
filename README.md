@@ -8,7 +8,7 @@ feeds, and resolves a video id to direct H.264/AAC stream URLs that the TV plays
 | `GET /api/categories` | Home-screen rows |
 | `GET /api/feed/{id}?limit=` | Videos for a category |
 | `GET /api/search?q=&page=&size=` | Search |
-| `GET /api/video/{id}` | Title, description and stream URLs (`video`+`audio`, `muxed`, `hls`) |
+| `GET /api/video/{id}` | Title, description and stream URLs (`video`+`audio`, `videos` per height, `muxed`, `hls`) |
 | `GET /healthz` | Probe |
 
 Stream URLs are tied to the requesting IP and expire in about 6 hours, so the TV must be on the same

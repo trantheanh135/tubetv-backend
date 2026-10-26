@@ -21,6 +21,7 @@ def test_pick_streams_prefers_h264_1080_and_aac():
     assert s["video"]["height"] == 1080
     assert s["audio"]["url"] == "https://x/140"
     assert s["muxed"]["url"].startswith("https://x/18")
+    assert [v["height"] for v in s["videos"]] == [720, 1080]
 
 
 def test_pick_streams_without_audio_only_muxed():
