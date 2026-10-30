@@ -39,7 +39,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: ghcr.io/trantheanh135/tubetv-backend:3111d94a896a15b4eba0e9f9232fcaffd7462b1f
+          image: ghcr.io/trantheanh135/tubetv-backend:bea2a0c5d9cb0de86909c32166ae894ac4553b92
           ports:
             - containerPort: 8080
           env:
